@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -5,8 +6,10 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+.ruff_cache/
 .ipynb_checkpoints/
 
-turboGliph-ref/
+# Notebook / comparison artifacts (regenerated on demand)
+examples/compare_out/
 tests/R_out/
 Rplots.pdf

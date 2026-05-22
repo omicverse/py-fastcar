@@ -46,7 +46,7 @@ Issues = "https://github.com/omicverse/py-fastcar/issues"
 
 [tool.setuptools.packages.find]
 include = ["pyfastcar*"]
-exclude = ["tests*"]
+exclude = ["tests*", "examples*", "FastCAR-ref*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
