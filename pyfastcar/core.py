@@ -48,7 +48,7 @@ def _as_csc(matrix, *, name: str = "matrix"):
     if isinstance(matrix, pd.DataFrame):
         genes = np.asarray(matrix.index, dtype=object)
         droplets = np.asarray(matrix.columns, dtype=object)
-        mat = sp.csc_matrix(matrix.to_numpy())
+        mat = _frame_to_csc(matrix)
     elif sp.issparse(matrix):
         mat = matrix.tocsc()
     elif isinstance(matrix, np.ndarray):
@@ -63,6 +63,48 @@ def _as_csc(matrix, *, name: str = "matrix"):
         droplets = np.array(
             [f"droplet{i}" for i in range(mat.shape[1])], dtype=object)
     return mat, genes, droplets
+
+
+def _frame_to_csc(frame: pd.DataFrame):
+    """CSC matrix from a DataFrame, keeping pandas-sparse frames sparse.
+
+    A frame whose every column has a pandas ``SparseDtype`` (what
+    ``DataFrame.sparse.from_spmatrix`` and :func:`pyfastcar.read_full_matrix`
+    return) is built straight from the stored values, so a full 10x raw
+    matrix is never densified.
+
+    Entries that are *not* stored hold the column's sparse ``fill_value``.
+    For count matrices that is 0, but since pandas 3.0 ``from_spmatrix``
+    keeps a float dtype's NA (``NaN``) as the fill value.  Both mean "no
+    counts", so both map to the implicit zeros of the CSC matrix.  Going
+    through ``DataFrame.to_numpy()`` instead would turn every absent count
+    into ``NaN``, make every droplet total ``NaN`` and silently disable the
+    empty-droplet detection.  Any other fill value is exact only after a
+    dense conversion, so that path is taken for it.
+    """
+    dtypes = list(frame.dtypes)
+    if not dtypes or not all(isinstance(dt, pd.SparseDtype) for dt in dtypes):
+        return sp.csc_matrix(frame.to_numpy())
+
+    n_rows, n_cols = frame.shape
+    indptr = np.zeros(n_cols + 1, dtype=np.int64)
+    indices = []
+    data = []
+    for j, (_, column) in enumerate(frame.items()):
+        arr = column.array                       # pandas SparseArray
+        fill = arr.fill_value
+        if not (pd.isna(fill) or fill == 0):
+            return sp.csc_matrix(frame.sparse.to_dense().to_numpy())
+        rows = np.asarray(arr.sp_index.to_int_index().indices, dtype=np.int64)
+        indices.append(rows)
+        data.append(np.asarray(arr.sp_values))
+        indptr[j + 1] = indptr[j] + rows.shape[0]
+    csc = sp.csc_matrix(
+        (np.concatenate(data), np.concatenate(indices), indptr),
+        shape=(n_rows, n_cols),
+    )
+    csc.sort_indices()
+    return csc
 
 
 def _col_sums(csc) -> np.ndarray:

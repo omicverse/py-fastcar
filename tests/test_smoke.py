@@ -76,18 +76,50 @@ def test_high_contamination_floors_at_zero():
 
 def test_sparse_roundtrip():
     full = _toy()
-    full_sp = sp.csc_matrix(full.to_numpy())
+    # float64 so that pandas >= 3 ``from_spmatrix`` picks a NaN fill value.
+    full_sp = sp.csc_matrix(full.to_numpy().astype(np.float64))
     profile = fc.determine_background_to_remove(
         pd.DataFrame.sparse.from_spmatrix(full_sp, index=full.index),
         None, empty_droplet_cutoff=EMPTY_CUTOFF,
         contamination_chance_cutoff=0.005)
-    cells_sp = sp.csr_matrix(full.iloc[:, :2].to_numpy())
+    assert profile["GENE0"] == 4
+    assert profile["GENE1"] == 1
+    assert profile["GENE2"] == 0
+    cells_sp = sp.csr_matrix(full.iloc[:, :2].to_numpy().astype(np.float64))
     corrected = fc.remove_background(
         pd.DataFrame.sparse.from_spmatrix(
             cells_sp, index=full.index, columns=full.columns[:2]),
         profile)
     assert isinstance(corrected, pd.DataFrame)
-    assert (corrected.to_numpy() >= 0).all()
+    np.testing.assert_array_equal(
+        corrected.to_numpy(),
+        np.array([[76, 91], [69, 87], [60, 90]], dtype=np.float64),
+    )
+
+
+def test_sparse_frame_nan_fill_value_is_zero():
+    # pandas >= 3 keeps NaN as the fill value of float sparse columns built
+    # by ``from_spmatrix``; the same layout is built here by hand so every
+    # pandas version exercises it.  Absent counts must read as 0, not NaN
+    # (NaN droplet totals would disable the empty-droplet detection).
+    full = _toy().astype(np.float64)
+    nan_fill = pd.SparseDtype("float64", np.nan)
+    full_sp = full.where(full != 0).astype(nan_fill)   # only non-zeros stored
+    assert all(isinstance(dt, pd.SparseDtype) for dt in full_sp.dtypes)
+    assert all(np.isnan(col.array.fill_value) for _, col in full_sp.items())
+
+    profile = fc.determine_background_to_remove(
+        full_sp, None, empty_droplet_cutoff=EMPTY_CUTOFF,
+        contamination_chance_cutoff=0.005)
+    assert profile["GENE0"] == 4
+    assert profile["GENE1"] == 1
+    assert profile["GENE2"] == 0
+
+    corrected = fc.remove_background(full_sp.iloc[:, :2], profile)
+    np.testing.assert_array_equal(
+        corrected.to_numpy(),
+        np.array([[76, 91], [69, 87], [60, 90]], dtype=np.float64),
+    )
 
 
 def test_unused_barcodes_excluded_from_nempty():
