@@ -164,4 +164,7 @@ def test_anndata_wrapper():
 
 
 def test_version():
-    assert fc.__version__ == "0.1.0"
+    import pathlib
+    import re
+    toml = (pathlib.Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
+    assert fc.__version__ == re.search(r'^version = "(.+)"', toml, re.M).group(1)

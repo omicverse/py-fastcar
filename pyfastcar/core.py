@@ -112,44 +112,35 @@ def _col_sums(csc) -> np.ndarray:
     return np.asarray(csc.sum(axis=0)).ravel()
 
 
-def _row_max_over_cols(csc, col_mask: np.ndarray) -> np.ndarray:
+def _entry_cols(csc) -> np.ndarray:
+    """Column (droplet) index of every stored entry of a CSC matrix."""
+    return np.repeat(np.arange(csc.shape[1], dtype=np.int64), np.diff(csc.indptr))
+
+
+def _row_max_over_cols(csc, col_mask: np.ndarray, cols=None) -> np.ndarray:
     """Per-gene maximum over the selected columns.
 
     Mirrors ``qlcMatrix::rowMax`` on a column subset of a sparse matrix:
-    a gene whose every selected entry is zero gets a max of 0.
+    a gene whose every selected entry is zero gets a max of 0.  Works on
+    the stored entries directly, so the (often ~10^6-column) raw matrix is
+    never sliced.
     """
-    n_genes = csc.shape[0]
-    if not col_mask.any():
-        return np.zeros(n_genes, dtype=csc.dtype)
-    sub = csc[:, col_mask]
-    if sub.nnz == 0:
-        return np.zeros(n_genes, dtype=sub.dtype)
-    # max of stored (positive) values per row; rows with no stored value -> 0.
-    sub = sub.tocsr()
-    out = np.zeros(n_genes, dtype=sub.dtype)
-    # csr.max(axis=1) treats missing entries as 0 implicitly for >=0 data;
-    # FastCAR counts are non-negative so this matches qlcMatrix::rowMax.
-    rmax = sub.max(axis=1)
-    out[:] = np.asarray(rmax.todense()).ravel()
+    cols = _entry_cols(csc) if cols is None else cols
+    keep = col_mask[cols]
+    out = np.zeros(csc.shape[0], dtype=csc.dtype)
+    # counts are non-negative, so the implicit zeros never exceed a stored value
+    np.maximum.at(out, csc.indices[keep], csc.data[keep])
     return out
 
 
-def _row_nonzero_counts(csc, col_mask: np.ndarray) -> np.ndarray:
+def _row_nonzero_counts(csc, col_mask: np.ndarray, cols=None) -> np.ndarray:
     """Per-gene count of non-zero entries over the selected columns.
 
     Mirrors ``Matrix::rowSums(M[, mask] != 0)`` in R.
     """
-    n_genes = csc.shape[0]
-    if not col_mask.any():
-        return np.zeros(n_genes, dtype=np.int64)
-    sub = csc[:, col_mask]
-    if sub.nnz == 0:
-        return np.zeros(n_genes, dtype=np.int64)
-    sub = sub.tocsr()
-    indicator = sub.copy()
-    indicator.data = (indicator.data != 0).astype(np.int64)
-    indicator.eliminate_zeros()
-    return np.asarray(indicator.sum(axis=1), dtype=np.int64).ravel()
+    cols = _entry_cols(csc) if cols is None else cols
+    keep = col_mask[cols] & (csc.data != 0)
+    return np.bincount(csc.indices[keep], minlength=csc.shape[0]).astype(np.int64)
 
 
 # --------------------------------------------------------------------------
@@ -202,14 +193,15 @@ def determine_background_to_remove(
     empty_mask = col_totals < empty_droplet_cutoff
 
     # gMax: highest count of every gene across the empty droplets.
-    background_max = _row_max_over_cols(full, empty_mask).astype(np.float64)
+    cols = _entry_cols(full)
+    background_max = _row_max_over_cols(full, empty_mask, cols).astype(np.float64)
 
     # nEmpty: empty droplets that are *not* unused barcodes (>0 reads).
     # R: table((colSums < cutoff) & (colSums > 0))[2]
     n_empty = int(np.count_nonzero(empty_mask & (col_totals > 0)))
 
     # occurrences: number of empty droplets in which each gene appears.
-    occurrences = _row_nonzero_counts(full, empty_mask)
+    occurrences = _row_nonzero_counts(full, empty_mask, cols)
 
     # frC: probability a background read of a gene ends up in a cell.
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -439,21 +431,27 @@ def describe_ambient_rna_sequence(
     col_totals = _col_sums(full)
 
     cutoffs = list(_r_seq(start, stop, by))
-    n_empty_droplets = []
-    genes_in_background = []
-    genes_contaminating = []
-    for cutoff in cutoffs:
-        empty_mask = col_totals < cutoff
-        n_empty = int(np.count_nonzero(empty_mask & (col_totals > 0)))
-        occurrences = _row_nonzero_counts(full, empty_mask)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            fr_c = (occurrences / n_empty if n_empty
-                    else np.zeros_like(occurrences, dtype=np.float64))
-        fr_c = np.asarray(fr_c, dtype=np.float64)
-        n_empty_droplets.append(n_empty)
-        genes_in_background.append(int(np.count_nonzero(occurrences != 0)))
-        genes_contaminating.append(
-            int(np.count_nonzero(fr_c > contamination_chance_cutoff)))
+    n_genes, n_cut = full.shape[0], len(cutoffs)
+    cut = np.asarray(cutoffs, dtype=np.float64)
+    # nEmpty per cutoff: droplets with 0 < total < cutoff.
+    pos = np.sort(col_totals[col_totals > 0])
+    n_empty = np.searchsorted(pos, cut, side="left")
+    # each non-zero entry first counts at the smallest cutoff above its
+    # droplet total; a (gene, bin) histogram cumulated over the bins gives
+    # the per-gene occurrences at every cutoff in one pass.
+    nz = full.data != 0
+    ent_tot = col_totals[_entry_cols(full)[nz]]
+    first_bin = np.searchsorted(cut, ent_tot, side="right")
+    inside = first_bin < n_cut
+    hist = np.bincount(full.indices[nz][inside] * n_cut + first_bin[inside],
+                       minlength=n_genes * n_cut).reshape(n_genes, n_cut)
+    occ = np.cumsum(hist, axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        fr_c = np.where(n_empty > 0, occ / np.maximum(n_empty, 1), 0.0)
+    n_empty_droplets = [int(v) for v in n_empty]
+    genes_in_background = [int(v) for v in np.count_nonzero(occ, axis=0)]
+    genes_contaminating = [
+        int(v) for v in np.count_nonzero(fr_c > contamination_chance_cutoff, axis=0)]
 
     return pd.DataFrame(
         {

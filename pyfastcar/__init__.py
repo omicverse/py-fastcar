@@ -39,7 +39,7 @@ from .core import (
 )
 from .io import read_cell_matrix, read_full_matrix
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # R-FastCAR-compatible aliases (dotted R names -> snake_case here).
 determine_background_to_remove.r_name = "determine.background.to.remove"

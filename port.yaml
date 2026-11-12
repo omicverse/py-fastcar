@@ -11,20 +11,20 @@ domain: single-cell   # single-cell | spatial | trajectory | bulk | proteomics |
 upstream:
   name: "FastCAR"
   source: "GitHub"   # CRAN | Bioconductor | GitHub | other
-  version: null   # TODO: upstream version the parity test was run against
+  version: "0.1.0"
   url: "https://github.com/Nusob888/FastCAR"
-  license: null   # TODO: upstream R package license (GPL-3, MIT, Artistic-2.0, …)
+  license: "GPL-3"
   citation: "Gocht A.M., Berg M., et al. FastCAR: fast correction for ambient RNA to facilitate differential gene expression analysis in single-cell RNA-sequencing datasets. BMC Genomics 24, 2023."
 omicverse:
-  module: null   # TODO: e.g. ov.single.pyDoubletFinder, or leave null
+  module: "ov.pp.ambient.remove_ambient(method='fastcar')"
   since: null
 parity:
-  status: unverified   # pass | partial | unverified
-  algorithm_class: null   # TODO: see omicverse-rebuildr/PARITY_TAXONOMY.md
-  metric: null   # TODO: pearson | spearman | ari | jaccard | max_abs_diff | …
-  threshold: null
-  value: null   # TODO: measured value on the canonical fixture
-  fixture: null
+  status: pass   # deterministic; every output equal to R
+  algorithm_class: deterministic
+  metric: max_abs_diff of profile, cutoff table and corrected counts
+  threshold: 0
+  value: "5 10x human-mouse mixtures: profiles, cutoff tables, recommended cutoffs and corrected counts identical (max |diff| 0)"
+  fixture: "10x hgmm_1k_v3 / 5k_v3 / 6k / 10k_v3 / 12k"
   test: "tests/test_exact_match.py"
 artifacts:
   audit: null
