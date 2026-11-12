@@ -96,8 +96,8 @@ per-gene subtraction amounts, the corrected integer matrix and the
 threshold-profiling table are all identical.
 
 `tests/test_exact_match.py` runs the R reference (`FastCAR::determine.background.to.remove`
-+ `remove.background` + `describe.ambient.RNA.sequence`) inside the `CMAP`
-environment on a deterministic synthetic raw matrix, saves every intermediate,
++ `remove.background` + `describe.ambient.RNA.sequence`) with the `Rscript` on
+`PATH` (FastCAR and qlcMatrix installed) on a deterministic synthetic raw matrix, saves every intermediate,
 and checks that the Python port reproduces them element-for-element.
 
 ```bash
@@ -110,6 +110,23 @@ pytest tests/test_smoke.py -q # smoke tests only (no R required)
 10x dataset (`data/pbmc1k_raw.h5ad`, a subset of 10x Genomics' `pbmc_1k_v3`
 raw feature-barcode matrix that still contains empty droplets) and visualizes
 the bit-exact agreement with omicverse.
+
+## Benchmark against R
+
+On five 10x Genomics human–mouse mixtures (0.38–1.98 million droplets),
+FastCAR 0.1.0 and pyfastcar 0.1.1 give identical cutoff tables, recommended
+cutoffs, per-gene profiles and corrected matrices. On one thread pyfastcar is
+2.3–12.5× faster at a fixed cutoff and 18–27× faster when it also scans the
+cutoff (`describe_ambient_rna_sequence` builds the table for all cutoffs in one
+pass over the matrix). Scripts and figure: [`report/`](report/).
+
+The human–mouse mixtures also show what the method removes. With the
+recommended cutoff, FastCAR removed 2–26% of the cross-species counts, and it
+removed the same fixed amount of each corrected gene from every cell, so cells
+that express the gene lose real counts too: in hgmm 12k the correction removed
+0.44% of all counts as contamination and 3.4% as the cells' own RNA. FastCAR is
+designed for differential expression on a few highly ambient genes, not as a
+full ambient-RNA removal.
 
 ## Relationship to omicverse
 
