@@ -1,6 +1,6 @@
 """pyfastcar -- pure-Python port of the R package FastCAR.
 
-FastCAR (Gocht / Berg et al., *BMC Genomics* 2023) is a deterministic,
+FastCAR (Berg et al., *BMC Genomics* 2023) is a deterministic,
 per-gene correction for ambient RNA in droplet-based single-cell RNA-seq.
 It inspects the "empty" droplets (libraries with very few UMIs), builds an
 ambient-RNA profile, and subtracts that profile -- gene by gene -- from the

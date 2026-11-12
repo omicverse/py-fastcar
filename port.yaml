@@ -14,7 +14,7 @@ upstream:
   version: "0.1.0"
   url: "https://github.com/Nusob888/FastCAR"
   license: "GPL-3"
-  citation: "Gocht A.M., Berg M., et al. FastCAR: fast correction for ambient RNA to facilitate differential gene expression analysis in single-cell RNA-sequencing datasets. BMC Genomics 24, 2023."
+  citation: "Berg M, Petoukhov I, van den Ende I, et al. FastCAR: fast correction for ambient RNA to facilitate differential gene expression analysis in single-cell RNA-sequencing datasets. BMC Genomics 24, 722 (2023). doi:10.1186/s12864-023-09822-3"
 omicverse:
   module: "ov.pp.ambient.remove_ambient(method='fastcar')"
   since: null
@@ -28,7 +28,7 @@ parity:
   test: "tests/test_exact_match.py"
 artifacts:
   audit: null
-  report: null
+  report: "https://omicverse.org/articles/pyfastcar.html"
   compare_notebook: "examples/compare_R_vs_Python.ipynb"
   function_notebook: null
 functions:

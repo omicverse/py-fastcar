@@ -1,6 +1,6 @@
 # pyfastcar
 
-A **pure-Python re-implementation of [FastCAR](https://github.com/LungCellAtlas/FastCAR)** (Gocht / Berg et al., *BMC Genomics* 2023) for fast, deterministic per-gene correction of ambient RNA in droplet-based single-cell RNA-seq data.
+A **pure-Python re-implementation of [FastCAR](https://github.com/LungCellAtlas/FastCAR)** (Berg et al., *BMC Genomics* 2023) for fast, deterministic per-gene correction of ambient RNA in droplet-based single-cell RNA-seq data.
 
 - AnnData-native — drop-in for the scanpy ecosystem
 - **No `rpy2`**, no R install — the empty-droplet detection, per-gene `gMax`/`frC` profiling, and count subtraction are all implemented directly in NumPy/SciPy
@@ -139,7 +139,7 @@ Developed **upstream** in [`omicverse`](https://github.com/Starlitnightly/omicve
 
 If you use this package, please cite the original FastCAR paper:
 
-> Gocht A.M., Berg M., *et al.* **FastCAR: fast correction for ambient RNA to facilitate differential gene expression analysis in single-cell RNA-sequencing datasets.** *BMC Genomics* 24, 2023.
+> Berg M., Petoukhov I., van den Ende I., *et al.* **FastCAR: fast correction for ambient RNA to facilitate differential gene expression analysis in single-cell RNA-sequencing datasets.** *BMC Genomics* 24, 722 (2023). https://doi.org/10.1186/s12864-023-09822-3
 
 and acknowledge omicverse / this repo for the Python port.
 
